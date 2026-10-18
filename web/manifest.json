@@ -1,6 +1,6 @@
 {
-    "name": "salman_stream_ui",
-    "short_name": "salman_stream_ui",
+    "name": "movie_box",
+    "short_name": "movie_box",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
