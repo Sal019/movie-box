@@ -27,4 +27,4 @@ flutter pub get
 flutter run            # or: flutter build web --release
 ```
 
-Live demo (GitHub Pages): https://sal019.github.io/salman-stream-ui/
+Live demo (GitHub Pages): https://sal019.github.io/movie-box/
