@@ -5,9 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
 // ---------------------------------------------------------------------------
-// MovieBox — UI/UX demo rebuilt in the style of the iQONE video-blog theme
-// (dark #111319 surfaces, signature green #1CC749 accent). Original demo
-// content only.
+// MovieBox — UI/UX demo recreating the iQONE video-blog theme's layout:
+// dark #111319 surfaces, green #1CC749 accent, top header + chip nav row,
+// 16:9 hero slider with a numbered playlist, square poster grid, detail and
+// intl-style player pages. Original demo content only.
 // ---------------------------------------------------------------------------
 
 const kBg = Color(0xFF111319);
@@ -50,6 +51,8 @@ class Title {
     required this.stream,
   });
   bool get isSeries => kind != 'Movie';
+  String get backdrop =>
+      id == 'dhaka2077' ? 'assets/images/hero-dhaka.webp' : poster;
 }
 
 const _sintel = 'https://archive.org/download/Sintel/sintel-2048-surround.mp4';
@@ -245,6 +248,7 @@ class MovieBoxApp extends StatelessWidget {
         scrollbarTheme: ScrollbarThemeData(
           thumbColor: WidgetStateProperty.all(kBtn),
         ),
+        drawerTheme: const DrawerThemeData(backgroundColor: kPanel),
       ),
       home: const HomePage(),
     );
@@ -273,49 +277,71 @@ void snack(BuildContext c, String msg) => ScaffoldMessenger.of(c).showSnackBar(
   ),
 );
 
+String metaLine(Title t) =>
+    '★ ${t.rating}   ${t.year}   ${t.age}   ${t.isSeries ? '${t.episodes} Episodes' : 'Movie'}   ${t.country}   ${t.genres.join(' ')}   ${t.language}';
+
 class GreenLabel extends StatelessWidget {
   final String text;
-  final VoidCallback? onTap;
-  const GreenLabel(this.text, {super.key, this.onTap});
+  const GreenLabel(this.text, {super.key});
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [kGreenA, kGreenB]),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-        ),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(colors: [kGreenA, kGreenB]),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Colors.black,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
       ),
     ),
   );
 }
 
-class GreyChip extends StatelessWidget {
-  final String text;
-  const GreyChip(this.text, {super.key});
+class RatingPill extends StatelessWidget {
+  final double rating;
+  const RatingPill(this.rating, {super.key});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.08),
+      color: kGreen,
       borderRadius: BorderRadius.circular(4),
     ),
-    child: Text(text, style: const TextStyle(color: kText, fontSize: 11.5)),
+    child: Text(
+      '★ $rating',
+      style: const TextStyle(
+        color: Colors.black,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
+}
+
+class AgeChip extends StatelessWidget {
+  final String text;
+  const AgeChip(this.text, {super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      border: Border.all(color: Colors.white54),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(color: Colors.white, fontSize: 11),
+    ),
   );
 }
 
 class SectionHead extends StatelessWidget {
   final String text;
-  final VoidCallback? onMore;
-  const SectionHead(this.text, {super.key, this.onMore});
+  const SectionHead(this.text, {super.key});
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 26, 16, 12),
@@ -331,24 +357,12 @@ class SectionHead extends StatelessWidget {
             color: Colors.white,
           ),
         ),
-        const Spacer(),
-        if (onMore != null)
-          TextButton(
-            onPressed: onMore,
-            child: const Text(
-              'More',
-              style: TextStyle(color: kGreen, fontSize: 13),
-            ),
-          ),
       ],
     ),
   );
 }
 
-String metaLine(Title t) =>
-    '★ ${t.rating}   ${t.year}   ${t.age}   ${t.isSeries ? '${t.episodes} Episodes' : 'Movie'}   ${t.country}   ${t.genres.join(' ')}   ${t.language}';
-
-// ------------------------------ site header ---------------------------------
+// ------------------------------ site chrome ---------------------------------
 
 class SiteHeader extends StatelessWidget implements PreferredSizeWidget {
   final bool showBack;
@@ -358,7 +372,6 @@ class SiteHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.of(context).size.width > 760;
     return AppBar(
       backgroundColor: kDeep,
       elevation: 0,
@@ -368,63 +381,37 @@ class SiteHeader extends StatelessWidget implements PreferredSizeWidget {
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.of(context).maybePop(),
             )
-          : null,
-      titleSpacing: showBack ? 0 : 16,
-      title: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
-            child: const Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Movie',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 21,
-                    ),
-                  ),
-                  TextSpan(
-                    text: 'Box',
-                    style: TextStyle(
-                      color: kGreen,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 21,
-                    ),
-                  ),
-                ],
+          : Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Icons.menu, color: Colors.white),
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
               ),
             ),
-          ),
-          if (wide) ...[
-            const SizedBox(width: 34),
-            for (final (label, genre) in const [
-              ('Anime', 'Anime'),
-              ('K-Drama', 'K-Drama'),
-              ('Movies', 'Movie'),
-              ('Series', 'Series'),
-              ('Drama', 'Drama'),
-            ])
-              InkWell(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => LabelPage(label: label, genre: genre),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    label,
-                    style: const TextStyle(color: kMenuLink, fontSize: 14.5),
-                  ),
+      titleSpacing: 2,
+      title: GestureDetector(
+        onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+        child: const Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: 'Movie',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 21,
                 ),
               ),
-          ],
-        ],
+              TextSpan(
+                text: 'Box',
+                style: TextStyle(
+                  color: kGreen,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 21,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       actions: [
         IconButton(
@@ -477,8 +464,161 @@ class SiteHeader extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
       ],
+    );
+  }
+}
+
+class SiteDrawer extends StatelessWidget {
+  const SiteDrawer({super.key});
+  @override
+  Widget build(BuildContext context) {
+    void go(String label, String genre) {
+      Navigator.of(context).pop();
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LabelPage(label: label, genre: genre),
+        ),
+      );
+    }
+
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          const DrawerHeader(
+            decoration: BoxDecoration(color: kDeep),
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Movie',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Box',
+                      style: TextStyle(
+                        color: kGreen,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          for (final (label, genre) in const [
+            ('Anime', 'Anime'),
+            ('K-Drama', 'K-Drama'),
+            ('Movies', 'Movie'),
+            ('Series', 'Series'),
+            ('Drama', 'Drama'),
+            ('Action', 'Action'),
+          ])
+            ListTile(
+              dense: true,
+              title: Text(label, style: const TextStyle(color: kText)),
+              onTap: () => go(label, genre),
+            ),
+          const Divider(color: kBtn),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Text(
+              'Language',
+              style: TextStyle(color: kGrey, fontSize: 12.5),
+            ),
+          ),
+          for (final lang in const [
+            'English',
+            'Jepang',
+            'Bahasa Indonesia',
+            'Malaysia',
+          ])
+            ListTile(
+              dense: true,
+              title: Text(lang, style: const TextStyle(color: kMenuLink)),
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          const Divider(color: kBtn),
+          for (final p in const [
+            'About Blog',
+            'Media Player',
+            'Privacy Policy',
+          ])
+            ListTile(
+              dense: true,
+              title: Text(p, style: const TextStyle(color: kMenuLink)),
+              onTap: () => Navigator.of(context).pop(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The chip nav row that sits under the header on the reference site.
+class ChipNavRow extends StatelessWidget {
+  const ChipNavRow({super.key});
+  @override
+  Widget build(BuildContext context) {
+    const chips = [
+      ('Rekomendasi', null),
+      ('Anime', 'Anime'),
+      ('K-Drama', 'K-Drama'),
+      ('Movies', 'Movie'),
+      ('Series', 'Series'),
+      ('Drama', 'Drama'),
+      ('Action', 'Action'),
+      ('Romance', 'Romance'),
+    ];
+    return Container(
+      color: kDeep,
+      height: 46,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        itemCount: chips.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final (label, genre) = chips[i];
+          final first = i == 0;
+          return InkWell(
+            onTap: genre == null
+                ? null
+                : () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => LabelPage(label: label, genre: genre),
+                    ),
+                  ),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: first ? kGreen : kPanel,
+                borderRadius: BorderRadius.circular(16),
+                border: first ? null : Border.all(color: Colors.white12),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: first ? Colors.black : kText,
+                  fontSize: 12.5,
+                  fontWeight: first ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -569,32 +709,22 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final popular = [...catalog]..sort((a, b) => b.rating.compareTo(a.rating));
-    final top10 = [...catalog]..sort((a, b) => a.rank.compareTo(b.rank));
     return Scaffold(
       appBar: const SiteHeader(),
+      drawer: const SiteDrawer(),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1180),
           child: ListView(
             children: [
+              const ChipNavRow(),
               const HeroSlider(),
+              const SectionHead('Latest Posts'),
+              const SquareGrid(),
               const SectionHead('Popular Posts'),
               for (final t in popular.take(3)) PopularCard(t: t),
-              const SectionHead('Top 10 Today'),
-              SizedBox(
-                height: 218,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: top10.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => RankCard(t: top10[i]),
-                ),
-              ),
               const SectionHead('Top Picks for You'),
-              PosterRail(items: catalog.reversed.toList()),
-              const SectionHead('Original'),
-              LandscapeRail(items: catalog),
+              PicksList(items: popular),
               const SectionHead('Browse Labels'),
               const LabelCloud(),
               const SiteFooter(),
@@ -606,6 +736,8 @@ class HomePage extends StatelessWidget {
   }
 }
 
+// ------------------------------ hero slider ---------------------------------
+
 class HeroSlider extends StatefulWidget {
   const HeroSlider({super.key});
   @override
@@ -616,12 +748,12 @@ class _HeroSliderState extends State<HeroSlider> {
   final _pc = PageController();
   Timer? _timer;
   int _page = 0;
-  final _slides = catalog.take(4).toList();
+  final _slides = catalog;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _timer = Timer.periodic(const Duration(milliseconds: 4500), (_) {
       if (!_pc.hasClients) return;
       final next = (_page + 1) % _slides.length;
       _pc.animateToPage(
@@ -641,10 +773,10 @@ class _HeroSliderState extends State<HeroSlider> {
 
   @override
   Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.width > 760 ? 430.0 : 470.0;
-    return SizedBox(
-      height: h,
+    return AspectRatio(
+      aspectRatio: 16 / 9,
       child: Stack(
+        fit: StackFit.expand,
         children: [
           PageView.builder(
             controller: _pc,
@@ -652,22 +784,68 @@ class _HeroSliderState extends State<HeroSlider> {
             onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (_, i) => HeroSlide(t: _slides[i]),
           ),
+          // numbered playlist overlay, right edge (like the reference slider)
           Positioned(
-            bottom: 14,
-            right: 16,
-            child: Row(
-              children: [
-                for (var i = 0; i < _slides.length; i++)
-                  Container(
-                    width: i == _page ? 22 : 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(left: 6),
-                    decoration: BoxDecoration(
-                      color: i == _page ? kGreen : Colors.white30,
-                      borderRadius: BorderRadius.circular(4),
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 118,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [Colors.transparent, Color(0xCC0A0C0F)],
+                ),
+              ),
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: _slides.length,
+                itemBuilder: (_, i) {
+                  final active = i == _page;
+                  final t = _slides[i];
+                  return InkWell(
+                    onTap: () => _pc.animateToPage(
+                      i,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOut,
                     ),
-                  ),
-              ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4.5,
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              color: active ? kGreen : Colors.white54,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              t.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: active ? Colors.white : Colors.white60,
+                                fontSize: 10.5,
+                                fontWeight: active
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -683,97 +861,107 @@ class HeroSlide extends StatelessWidget {
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
     children: [
-      Image.asset(t.poster, fit: BoxFit.cover),
+      Image.asset(t.backdrop, fit: BoxFit.cover),
       const DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.transparent, Color(0xE6111319), kBg],
-            stops: [0.25, 0.78, 1],
+            colors: [Colors.transparent, Color(0xD9111319)],
+            stops: [0.45, 1],
           ),
         ),
       ),
       Positioned(
-        left: 16,
-        right: 16,
-        bottom: 30,
+        left: 14,
+        right: 128,
+        bottom: 12,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            GreenLabel('Trending #${t.rank}'),
-            const SizedBox(height: 10),
+            Row(
+              children: [
+                GreenLabel(t.kind),
+                const SizedBox(width: 6),
+                const Text(
+                  'Popular Posts',
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
             Text(
               t.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: FontWeight.w900,
                 height: 1.05,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              metaLine(t),
-              style: const TextStyle(color: kText, fontSize: 12.5),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                RatingPill(t.rating),
+                const SizedBox(width: 8),
+                Text(
+                  t.year,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+                const SizedBox(width: 8),
+                AgeChip(t.age),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    t.genres.take(2).join(' • '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [for (final g in t.genres) GreyChip(g)],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              t.synopsis,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFFC9CACD),
-                fontSize: 13,
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 9),
             Row(
               children: [
                 ElevatedButton.icon(
                   onPressed: () => openPlay(context, t),
-                  icon: const Icon(Icons.play_arrow, size: 20),
-                  label: const Text('Watch Now'),
+                  icon: const Icon(Icons.play_arrow, size: 19),
+                  label: const Text('Play'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kGreen,
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+                      horizontal: 18,
+                      vertical: 9,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     textStyle: const TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 14.5,
+                      fontSize: 14,
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: () => openDetail(context, t),
-                  icon: const Icon(Icons.info_outline, size: 19),
-                  label: const Text('Details'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: kBtn.withValues(alpha: 0.85),
-                    side: BorderSide.none,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
+                _CircleBtn(
+                  icon: Icons.bookmark_border,
+                  onTap: () {
+                    UserStore.toggleLater(t.id);
+                    snack(context, 'Saved to Watch Later');
+                  },
+                ),
+                const SizedBox(width: 8),
+                _CircleBtn(
+                  icon: Icons.share_outlined,
+                  onTap: () => snack(context, 'Share (demo)'),
                 ),
               ],
             ),
@@ -783,6 +971,130 @@ class HeroSlide extends StatelessWidget {
     ],
   );
 }
+
+class _CircleBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _CircleBtn({required this.icon, required this.onTap});
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    customBorder: const CircleBorder(),
+    child: Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white70, width: 1.2),
+      ),
+      child: Icon(icon, color: Colors.white, size: 18),
+    ),
+  );
+}
+
+// --------------------------- square poster grid -----------------------------
+
+class SquareGrid extends StatelessWidget {
+  const SquareGrid({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 170,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.78,
+      ),
+      itemCount: catalog.length,
+      itemBuilder: (_, i) => SquareCard(t: catalog[i]),
+    );
+  }
+}
+
+class SquareCard extends StatelessWidget {
+  final Title t;
+  const SquareCard({super.key, required this.t});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () => openDetail(context, t),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AspectRatio(
+          aspectRatio: 1,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.asset(t.poster, fit: BoxFit.cover),
+              ),
+              Positioned(
+                left: 6,
+                top: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    t.country,
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 2,
+                top: 2,
+                child: ValueListenableBuilder<Set<String>>(
+                  valueListenable: UserStore.later,
+                  builder: (_, later, __) => IconButton(
+                    iconSize: 19,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      later.contains(t.id)
+                          ? Icons.bookmark
+                          : Icons.bookmark_border,
+                      color: later.contains(t.id) ? kGreen : Colors.white,
+                      shadows: const [
+                        Shadow(color: Colors.black, blurRadius: 6),
+                      ],
+                    ),
+                    onPressed: () => UserStore.toggleLater(t.id),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          t.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          '${t.year} • ★ ${t.rating}',
+          style: const TextStyle(color: kGrey, fontSize: 11),
+        ),
+      ],
+    ),
+  );
+}
+
+// ------------------------------ popular card --------------------------------
 
 class PopularCard extends StatelessWidget {
   final Title t;
@@ -856,173 +1168,69 @@ class PopularCard extends StatelessWidget {
   );
 }
 
-class RankCard extends StatelessWidget {
-  final Title t;
-  const RankCard({super.key, required this.t});
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: () => openDetail(context, t),
-    child: SizedBox(
-      width: 118,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(7),
-                child: Image.asset(
-                  t.poster,
-                  width: 104,
-                  height: 156,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              Positioned(
-                left: -7,
-                bottom: -8,
-                child: Text(
-                  '${t.rank}',
-                  style: TextStyle(
-                    fontSize: 52,
-                    fontWeight: FontWeight.w900,
-                    foreground: Paint()
-                      ..style = PaintingStyle.stroke
-                      ..strokeWidth = 2.2
-                      ..color = kGreen,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Text(
-              t.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+// ------------------------------- picks list ---------------------------------
 
-class PosterRail extends StatelessWidget {
+class PicksList extends StatelessWidget {
   final List<Title> items;
-  const PosterRail({super.key, required this.items});
+  const PicksList({super.key, required this.items});
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 216,
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 11),
-      itemBuilder: (_, i) => PosterCard(t: items[i]),
-    ),
-  );
-}
-
-class PosterCard extends StatelessWidget {
-  final Title t;
-  final double w;
-  const PosterCard({super.key, required this.t, this.w = 112});
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: () => openDetail(context, t),
-    child: SizedBox(
-      width: w,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(7),
-            child: Image.asset(
-              t.poster,
-              width: w,
-              height: w * 1.42,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            t.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Text(
-            '${t.year} • ★ ${t.rating}',
-            style: const TextStyle(color: kGrey, fontSize: 11),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class LandscapeRail extends StatelessWidget {
-  final List<Title> items;
-  const LandscapeRail({super.key, required this.items});
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 158,
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 12),
-      itemBuilder: (_, i) {
-        final t = items[i];
-        return GestureDetector(
-          onTap: () => openDetail(context, t),
-          child: SizedBox(
-            width: 218,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(7),
-                  child: Image.asset(
-                    t.poster,
-                    width: 218,
-                    height: 116,
-                    fit: BoxFit.cover,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Column(
+      children: [
+        for (var i = 0; i < items.length; i++)
+          InkWell(
+            onTap: () => openDetail(context, items[i]),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                children: [
+                  Text(
+                    '${i + 1}',
+                    style: const TextStyle(
+                      color: kGreen,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  t.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(width: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    child: Image.asset(
+                      items[i].poster,
+                      width: 54,
+                      height: 54,
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                ),
-                Text(
-                  '${t.kind} • ${t.year}',
-                  style: const TextStyle(color: kGrey, fontSize: 11),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          items[i].name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '★ ${items[i].rating} • ${items[i].year} • ${items[i].kind}',
+                          style: const TextStyle(color: kGrey, fontSize: 11.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: kGrey, size: 20),
+                ],
+              ),
             ),
           ),
-        );
-      },
+      ],
     ),
   );
 }
@@ -1108,19 +1316,38 @@ class _DetailPageState extends State<DetailPage> {
           constraints: const BoxConstraints(maxWidth: 1180),
           child: ListView(
             children: [
-              SizedBox(
-                height: 250,
+              const ChipNavRow(),
+              AspectRatio(
+                aspectRatio: 16 / 9,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.asset(t.poster, fit: BoxFit.cover),
+                    Image.asset(t.backdrop, fit: BoxFit.cover),
                     const DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Color(0x55111319), kBg],
-                          stops: [0.35, 1],
+                          colors: [Colors.transparent, kBg],
+                          stops: [0.55, 1],
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: GestureDetector(
+                        onTap: () => openPlay(context, t),
+                        child: Container(
+                          width: 62,
+                          height: 62,
+                          decoration: BoxDecoration(
+                            color: kGreen.withValues(alpha: 0.92),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.play_arrow,
+                            color: Colors.black,
+                            size: 34,
+                          ),
                         ),
                       ),
                     ),
@@ -1128,7 +1355,7 @@ class _DetailPageState extends State<DetailPage> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1139,8 +1366,8 @@ class _DetailPageState extends State<DetailPage> {
                           borderRadius: BorderRadius.circular(7),
                           child: Image.asset(
                             t.poster,
-                            width: 104,
-                            height: 148,
+                            width: 96,
+                            height: 136,
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -1153,7 +1380,7 @@ class _DetailPageState extends State<DetailPage> {
                                 t.name,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 24,
+                                  fontSize: 23,
                                   fontWeight: FontWeight.w900,
                                   height: 1.1,
                                 ),
@@ -1164,16 +1391,35 @@ class _DetailPageState extends State<DetailPage> {
                                 runSpacing: 6,
                                 children: [
                                   GreenLabel(t.kind),
-                                  for (final g in t.genres.take(3)) GreyChip(g),
+                                  for (final g in t.genres.take(3))
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 9,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        g,
+                                        style: const TextStyle(
+                                          color: kText,
+                                          fontSize: 11.5,
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Popularity Rank #${t.rank}',
+                                'Popularity Rank #${t.rank} • 0 Comments • Last updated Oct 18, 2026',
                                 style: const TextStyle(
                                   color: kGreen,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -1191,28 +1437,29 @@ class _DetailPageState extends State<DetailPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => openPlay(context, t),
-                            icon: const Icon(Icons.play_arrow, size: 20),
-                            label: Text(t.isSeries ? 'Play Episode 1' : 'Play'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kGreen,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              textStyle: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14.5,
-                              ),
-                            ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => openPlay(context, t),
+                        icon: const Icon(Icons.play_arrow, size: 20),
+                        label: Text(t.isSeries ? 'Play Episode 1' : 'Play'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kGreen,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
                           ),
                         ),
-                        const SizedBox(width: 9),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
                         ValueListenableBuilder<Set<String>>(
                           valueListenable: UserStore.later,
                           builder: (_, later, __) => ActionBtn(
@@ -1279,7 +1526,7 @@ class _DetailPageState extends State<DetailPage> {
                     ),
                     const ShareRow(),
                     if (t.isSeries) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Row(
                         children: [
                           const Text(
@@ -1469,6 +1716,64 @@ class ShareRow extends StatelessWidget {
       ],
     );
   }
+}
+
+class PosterRail extends StatelessWidget {
+  final List<Title> items;
+  const PosterRail({super.key, required this.items});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 216,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 11),
+      itemBuilder: (_, i) => PosterCard(t: items[i]),
+    ),
+  );
+}
+
+class PosterCard extends StatelessWidget {
+  final Title t;
+  final double w;
+  const PosterCard({super.key, required this.t, this.w = 112});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () => openDetail(context, t),
+    child: SizedBox(
+      width: w,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(7),
+            child: Image.asset(
+              t.poster,
+              width: w,
+              height: w * 1.42,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            t.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            '${t.year} • ★ ${t.rating}',
+            style: const TextStyle(color: kGrey, fontSize: 11),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 // -------------------------------- play --------------------------------------
@@ -1665,6 +1970,41 @@ class _PlayPageState extends State<PlayPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        ValueListenableBuilder<Set<String>>(
+                          valueListenable: UserStore.later,
+                          builder: (_, later, __) => ActionBtn(
+                            icon: later.contains(t.id)
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            label: 'Watch Later',
+                            active: later.contains(t.id),
+                            onTap: () => UserStore.toggleLater(t.id),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        ValueListenableBuilder<Set<String>>(
+                          valueListenable: UserStore.favs,
+                          builder: (_, favs, __) => ActionBtn(
+                            icon: favs.contains(t.id)
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            label: 'Favorite',
+                            active: favs.contains(t.id),
+                            onTap: () => UserStore.toggleFav(t.id),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        ActionBtn(
+                          icon: Icons.share_outlined,
+                          label: 'Share',
+                          active: false,
+                          onTap: () => snack(context, 'Share (demo)'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
                     Text(
                       t.isSeries
                           ? '${t.name} — Season $_season Episode $_ep'
@@ -1722,12 +2062,12 @@ class _PlayPageState extends State<PlayPage> {
                       ],
                     ),
                     if (t.isSeries) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       Row(
                         children: [
-                          const Text(
-                            'Episodes',
-                            style: TextStyle(
+                          Text(
+                            '${t.name} Episodes',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
@@ -1770,66 +2110,41 @@ class _PlayPageState extends State<PlayPage> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      SizedBox(
-                        height: 42,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: epsThisSeason,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (_, i) {
-                            final e = i + 1;
-                            final active = e == _ep;
-                            return InkWell(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (var e = 1; e <= epsThisSeason; e++)
+                            InkWell(
                               onTap: () => setState(() => _ep = e),
                               borderRadius: BorderRadius.circular(5),
                               child: Container(
                                 width: 48,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 9,
+                                ),
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: active ? kGreen : kBtn,
+                                  color: kBtn,
+                                  border: Border.all(
+                                    color: e == _ep
+                                        ? kGreen
+                                        : Colors.transparent,
+                                  ),
                                   borderRadius: BorderRadius.circular(5),
                                 ),
                                 child: Text(
                                   '$e',
                                   style: TextStyle(
-                                    color: active ? Colors.black : Colors.white,
+                                    color: e == _ep ? kGreen : Colors.white,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        ValueListenableBuilder<Set<String>>(
-                          valueListenable: UserStore.later,
-                          builder: (_, later, __) => ActionBtn(
-                            icon: later.contains(t.id)
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            label: 'Watch Later',
-                            active: later.contains(t.id),
-                            onTap: () => UserStore.toggleLater(t.id),
-                          ),
-                        ),
-                        const SizedBox(width: 9),
-                        ValueListenableBuilder<Set<String>>(
-                          valueListenable: UserStore.favs,
-                          builder: (_, favs, __) => ActionBtn(
-                            icon: favs.contains(t.id)
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            label: 'Favorite',
-                            active: favs.contains(t.id),
-                            onTap: () => UserStore.toggleFav(t.id),
-                          ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Deskripsi :',
