@@ -26,14 +26,14 @@ class _NovaAppState extends State<NovaApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Nova — Stream UI Demo',
+      title: 'MovieBox — Stream UI Demo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: kBg,
         colorScheme: const ColorScheme.dark(
-          primary: kCyan,
-          secondary: kViolet,
+          primary: Colors.white,
+          secondary: Colors.white70,
           surface: kSurface,
         ),
         useMaterial3: true,

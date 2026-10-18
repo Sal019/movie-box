@@ -4,6 +4,10 @@ import 'state.dart';
 import 'widgets.dart';
 import 'home.dart' show openTitle, playTitle;
 
+/// AniLab-style title detail page, recreated from public screenshots:
+/// full-bleed backdrop, centered title, gray TV/rating chips, meta line,
+/// Share | white-pill Watch | My List row, synopsis, Episodes (series),
+/// Related + You May Also Like portrait rails.
 class TitlePage extends StatefulWidget {
   final AppState state;
   final TitleItem title;
@@ -13,7 +17,6 @@ class TitlePage extends StatefulWidget {
 }
 
 class _TitlePageState extends State<TitlePage> {
-  int _tab = 0; // 0 episodes/more, 1 more like this, 2 trailers
   int _seasonIdx = 0;
 
   TitleItem get t => widget.title;
@@ -25,292 +28,211 @@ class _TitlePageState extends State<TitlePage> {
       animation: state,
       builder: (context, _) => Scaffold(
         backgroundColor: kBg,
-        body: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              _backdrop(context),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(t.name,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 8),
-                      _metaRow(),
-                      const SizedBox(height: 14),
-                      _playButtons(context),
-                      const SizedBox(height: 14),
-                      Text(t.synopsis,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 13.5, height: 1.45)),
-                      const SizedBox(height: 10),
-                      Text('Cast: ${t.castLine}',
-                          style: const TextStyle(
-                              color: Colors.white54, fontSize: 12.5)),
-                      Text(t.creatorLine,
-                          style: const TextStyle(
-                              color: Colors.white54, fontSize: 12.5)),
-                      const SizedBox(height: 16),
-                      _actionRow(context),
-                      const SizedBox(height: 8),
-                      _tabsHeader(),
+        body: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            _hero(context),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 16, 14, 0),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t.synopsis,
+                        style: const TextStyle(
+                            color: Color(0xFFD8D8DC),
+                            fontSize: 14,
+                            height: 1.5)),
+                    const SizedBox(height: 10),
+                    Text('Cast: ${t.castLine}',
+                        style: const TextStyle(color: kDim, fontSize: 12.5)),
+                    Text(t.creatorLine,
+                        style: const TextStyle(color: kDim, fontSize: 12.5)),
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      Expanded(
+                        child: _tileButton(
+                          Icons.download_rounded,
+                          t.isSeries
+                              ? 'Download S${_seasonIdx + 1}'
+                              : 'Download',
+                          () => toast(context, 'Download started (demo)'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _tileButton(
+                          Icons.play_circle_outline_rounded,
+                          'Trailer',
+                          () => playTitle(context, state, t),
+                        ),
+                      ),
                     ]),
-              ),
-              _tabBody(context),
-              const SizedBox(height: 30),
-            ],
-          ),
+                  ]),
+            ),
+            if (t.isSeries) _episodesSection(context),
+            const SectionHeader('Related'),
+            _portraitRail(context, _related()),
+            const SectionHeader('You May Also Like'),
+            _portraitRail(context, _alsoLike()),
+            const SizedBox(height: 28),
+          ],
         ),
       ),
     );
   }
 
-  Widget _backdrop(BuildContext context) {
-    return Stack(children: [
-      AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Image.asset(t.backdrop, fit: BoxFit.cover),
-      ),
-      Positioned.fill(
-        child: Container(
-          decoration: const BoxDecoration(
+  Widget _hero(BuildContext context) {
+    final inList = state.inMyList(t.id);
+    final h = MediaQuery.of(context).size.height * 0.52;
+    return SizedBox(
+      height: h,
+      child: Stack(fit: StackFit.expand, children: [
+        Image.asset(t.backdrop, fit: BoxFit.cover),
+        const DecoratedBox(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.transparent, kBg],
+              colors: [Colors.black45, Colors.transparent, Colors.black],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              stops: [0.55, 1],
+              stops: [0, 0.4, 1],
             ),
           ),
         ),
-      ),
-      Positioned(
-        right: 12,
-        top: 10,
-        child: Row(children: [
-          _circleBtn(Icons.cast_rounded,
-              () => toast(context, 'Cast is a demo in this UI')),
-          const SizedBox(width: 8),
-          _circleBtn(Icons.close_rounded, () => Navigator.pop(context)),
-        ]),
-      ),
-      Positioned.fill(
-        child: Center(
-          child: GestureDetector(
-            onTap: () => playTitle(context, state, t),
-            child: Container(
-              width: 62,
-              height: 62,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black.withValues(alpha: 0.45),
-                border: Border.all(color: Colors.white70, width: 1.5),
-              ),
-              child: const Icon(Icons.play_arrow_rounded,
-                  color: Colors.white, size: 36),
+        Positioned(
+          top: 0,
+          left: 4,
+          child: SafeArea(
+            bottom: false,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded,
+                  color: Colors.white, size: 26),
+              onPressed: () => Navigator.pop(context),
             ),
           ),
         ),
-      ),
-    ]);
+        Positioned(
+          left: 18,
+          right: 18,
+          bottom: 12,
+          child: Column(children: [
+            Text(t.name,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    height: 1.15)),
+            const SizedBox(height: 11),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              MetaChip(t.isSeries ? 'TV' : 'MOVIE'),
+              const SizedBox(width: 8),
+              MetaChip(t.maturity.replaceAll('+', '').trim().isEmpty
+                  ? 'PG'
+                  : 'PG ${t.maturity.replaceAll('+', '')}'),
+            ]),
+            const SizedBox(height: 10),
+            Text(
+                '${t.year}  •  ${t.isSeries ? 'Releasing' : 'Released'}  •  ${t.durationLabel}  •  ★ ${t.rating.toStringAsFixed(1)}',
+                style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 6),
+            Text(t.genres.join(' • '),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 15),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                SideAction(
+                    icon: Icons.share_outlined,
+                    label: 'Share',
+                    onTap: () =>
+                        toast(context, 'Share link copied (demo)')),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 38, vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
+                  ),
+                  onPressed: () => playTitle(context, state, t,
+                      episode: t.isSeries
+                          ? t.seasons[_seasonIdx].episodes.first
+                          : null),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                  label: const Text('Watch',
+                      style: TextStyle(
+                          fontSize: 16.5, fontWeight: FontWeight.w700)),
+                ),
+                SideAction(
+                    icon: inList
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    label: 'My List',
+                    onTap: () => state.toggleMyList(t.id)),
+              ],
+            ),
+          ]),
+        ),
+      ]),
+    );
   }
 
-  Widget _circleBtn(IconData icon, VoidCallback onTap) {
+  Widget _tileButton(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 34,
-        height: 34,
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.55), shape: BoxShape.circle),
-        child: Icon(icon, color: Colors.white, size: 19),
+            color: kTile, borderRadius: BorderRadius.circular(10)),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 8),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600)),
+        ]),
       ),
     );
   }
 
-  Widget _metaRow() {
-    return Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 8,
-      runSpacing: 6,
-      children: [
-        Text('${t.matchPercent}% Match',
-            style: const TextStyle(
-                color: Color(0xFF46D369),
-                fontWeight: FontWeight.w700,
-                fontSize: 13)),
-        Text('${t.year}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-              border: Border.all(color: Colors.white38),
-              borderRadius: BorderRadius.circular(4)),
-          child: Text(t.maturity,
-              style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
-        ),
-        Text(t.durationLabel,
-            style: const TextStyle(color: Colors.white70, fontSize: 13)),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-          decoration: BoxDecoration(
-              border: Border.all(color: Colors.white38),
-              borderRadius: BorderRadius.circular(4)),
-          child: const Text('HD',
-              style: TextStyle(color: Colors.white70, fontSize: 10.5)),
-        ),
-        if (t.top10Rank != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-                gradient: kAccent, borderRadius: BorderRadius.circular(5)),
-            child: Text('#${t.top10Rank} in Bangladesh Today',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700)),
-          ),
-      ],
-    );
-  }
-
-  Widget _playButtons(BuildContext context) {
-    return Column(children: [
-      SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          onPressed: () => playTitle(context, state, t,
-              episode: t.isSeries ? t.seasons[_seasonIdx].episodes.first : null),
-          icon: const Icon(Icons.play_arrow_rounded, size: 26),
-          label: Text(t.isSeries ? 'Play S${_seasonIdx + 1}:E1' : 'Play',
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        ),
-      ),
-      const SizedBox(height: 8),
-      SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: kSurface2,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          onPressed: () => toast(context, 'Download started (demo)'),
-          icon: const Icon(Icons.download_rounded, size: 22),
-          label: Text(
-              t.isSeries ? 'Download Season ${_seasonIdx + 1}' : 'Download',
-              style:
-                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-        ),
-      ),
-    ]);
-  }
-
-  Widget _actionRow(BuildContext context) {
-    final inList = state.inMyList(t.id);
-    Widget item(IconData icon, String label, VoidCallback onTap,
-        {Color color = Colors.white}) {
-      return GestureDetector(
-        onTap: onTap,
-        child: SizedBox(
-          width: 76,
-          child: Column(children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 5),
-            Text(label,
-                style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
-          ]),
-        ),
-      );
-    }
-
-    return Row(children: [
-      item(inList ? Icons.check_rounded : Icons.add_rounded, 'My List',
-          () => state.toggleMyList(t.id)),
-      item(Icons.thumb_up_alt_outlined, 'Rate',
-          () => toast(context, 'Thanks for rating (demo)')),
-      item(Icons.share_rounded, 'Share',
-          () => toast(context, 'Share link copied (demo)')),
-      item(Icons.download_outlined, 'Download',
-          () => toast(context, 'Download started (demo)')),
-    ]);
-  }
-
-  Widget _tabsHeader() {
-    final labels = t.isSeries
-        ? ['Episodes', 'More Like This', 'Trailers & More']
-        : ['More Like This', 'Trailers & More'];
-    return Row(
-      children: List.generate(labels.length, (i) {
-        final idx = t.isSeries ? i : i + 1;
-        final active = _tab == idx || (!t.isSeries && _tab == 0 && i == 0);
-        return GestureDetector(
-          onTap: () => setState(() => _tab = idx),
-          child: Container(
-            margin: const EdgeInsets.only(right: 18),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                    color: active ? kCyan : Colors.transparent, width: 3),
-              ),
-            ),
-            child: Text(labels[i],
-                style: TextStyle(
-                    color: active ? Colors.white : Colors.white54,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14.5)),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _tabBody(BuildContext context) {
-    if (t.isSeries && _tab == 0) return _episodes(context);
-    if (_tab == 2) return _trailers(context);
-    return _moreLikeThis(context);
-  }
-
-  Widget _episodes(BuildContext context) {
+  Widget _episodesSection(BuildContext context) {
     final season = t.seasons[_seasonIdx];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 22, 14, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // season selector
-        GestureDetector(
-          onTap: () => _seasonMenu(context),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-                color: kSurface2, borderRadius: BorderRadius.circular(8)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text('Season ${season.number}',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
-              const SizedBox(width: 6),
-              const Icon(Icons.keyboard_arrow_down_rounded,
-                  color: Colors.white, size: 20),
-            ]),
+        Row(children: [
+          const Text('Episodes',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800)),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => _seasonMenu(context),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                  color: kTile, borderRadius: BorderRadius.circular(8)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Season ${season.number}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5)),
+                const SizedBox(width: 4),
+                const Icon(Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white, size: 19),
+              ]),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        for (final ep in season.episodes)
-          _episodeRow(context, ep),
+        ]),
+        const SizedBox(height: 6),
+        for (final ep in season.episodes) _episodeRow(context, ep),
       ]),
     );
   }
@@ -320,7 +242,7 @@ class _TitlePageState extends State<TitlePage> {
       context: context,
       backgroundColor: kSurface,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Padding(
@@ -329,14 +251,14 @@ class _TitlePageState extends State<TitlePage> {
                 style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
-                    fontWeight: FontWeight.w700)),
+                    fontWeight: FontWeight.w800)),
           ),
           for (var i = 0; i < t.seasons.length; i++)
             ListTile(
               title: Text('Season ${t.seasons[i].number}',
                   style: const TextStyle(color: Colors.white)),
               trailing: i == _seasonIdx
-                  ? const Icon(Icons.check, color: kCyan)
+                  ? const Icon(Icons.check, color: Colors.white)
                   : null,
               onTap: () {
                 setState(() => _seasonIdx = i);
@@ -350,100 +272,85 @@ class _TitlePageState extends State<TitlePage> {
   }
 
   Widget _episodeRow(BuildContext context, Episode ep) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          GestureDetector(
-            onTap: () => playTitle(context, state, t, episode: ep),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Stack(children: [
-                Image.asset(t.backdrop,
-                    width: 118, height: 66, fit: BoxFit.cover),
-                const Positioned.fill(
-                  child: Center(
-                    child: Icon(Icons.play_circle_outline_rounded,
-                        color: Colors.white, size: 30),
-                  ),
-                ),
-              ]),
-            ),
+    return GestureDetector(
+      onTap: () => playTitle(context, state, t, episode: ep),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(
+            width: 34,
+            child: Text('${ep.number}',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700)),
           ),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${ep.number}. ${ep.name}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  Text(ep.name,
                       style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
-                          fontSize: 14)),
+                          fontSize: 14.5)),
+                  const SizedBox(height: 2),
                   Text(ep.durationLabel,
+                      style: const TextStyle(color: kDim, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Text(ep.synopsis,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          color: Colors.white54, fontSize: 12)),
+                          color: kDim, fontSize: 12.5, height: 1.35)),
                 ]),
           ),
-          IconButton(
-            icon: const Icon(Icons.download_rounded, color: Colors.white),
-            onPressed: () => toast(context, 'Episode download started (demo)'),
-          ),
+          const SizedBox(width: 8),
+          Column(children: [
+            const Icon(Icons.play_circle_outline_rounded,
+                color: Colors.white, size: 30),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () =>
+                  toast(context, 'Episode download started (demo)'),
+              child: const Icon(Icons.download_rounded,
+                  color: kDim, size: 21),
+            ),
+          ]),
         ]),
-        const SizedBox(height: 6),
-        Text(ep.synopsis,
-            style: const TextStyle(
-                color: Colors.white60, fontSize: 12.5, height: 1.4)),
-      ]),
-    );
-  }
-
-  Widget _moreLikeThis(BuildContext context) {
-    final similar =
-        catalog.where((x) => x.id != t.id && x.genres.any(t.genres.contains)).toList();
-    final list = similar.isEmpty
-        ? catalog.where((x) => x.id != t.id).toList()
-        : similar;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 0.66,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-        ),
-        itemCount: list.length.clamp(0, 6),
-        itemBuilder: (context, i) => PosterCard(
-          title: list[i],
-          width: double.infinity,
-          onTap: () => openTitle(context, state, list[i]),
-        ),
       ),
     );
   }
 
-  Widget _trailers(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      child: Column(children: [
-        LandscapeCard(
-          title: t,
-          width: MediaQuery.of(context).size.width - 32,
-          progressRatio: 0,
-          onTap: () => playTitle(context, state, t),
-        ),
-        const SizedBox(height: 6),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text('Official Trailer',
-              style: TextStyle(color: Colors.white70, fontSize: 13)),
-        ),
-      ]),
+  List<TitleItem> _related() {
+    final rel =
+        catalog.where((x) => x.id != t.id && x.genres.any(t.genres.contains)).toList();
+    return (rel.isEmpty ? catalog.where((x) => x.id != t.id).toList() : rel)
+        .take(6)
+        .toList();
+  }
+
+  List<TitleItem> _alsoLike() {
+    final first = _related().map((x) => x.id).toSet();
+    final rest = catalog
+        .where((x) => x.id != t.id && !first.contains(x.id))
+        .toList();
+    return (rest.isEmpty ? _related() : rest).take(6).toList();
+  }
+
+  Widget _portraitRail(BuildContext context, List<TitleItem> titles) {
+    return SizedBox(
+      height: 176,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        itemCount: titles.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, i) => PosterCard(
+            title: titles[i],
+            onTap: () => openTitle(context, state, titles[i])),
+      ),
     );
   }
 }

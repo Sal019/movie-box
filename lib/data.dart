@@ -43,6 +43,7 @@ class TitleItem {
   final List<Season> seasons;
   final int? top10Rank;
   final double continueProgress; // 0..1 seed for Continue Watching
+  final double rating; // star rating shown in AniLab-style meta line
 
   const TitleItem({
     required this.id,
@@ -63,6 +64,7 @@ class TitleItem {
     this.seasons = const [],
     this.top10Rank,
     this.continueProgress = 0,
+    this.rating = 8.6,
   });
 }
 

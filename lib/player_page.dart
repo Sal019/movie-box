@@ -6,6 +6,9 @@ import 'data.dart';
 import 'state.dart';
 import 'widgets.dart';
 
+/// AniLab-style player: monochrome floating controls, white seek bar,
+/// quality selector top-right, server + SUB/DUB picker (like AniLab's
+/// watch flow), episodes sheet, speed, screen lock, Skip Intro, Next Ep.
 class PlayerPage extends StatefulWidget {
   final AppState state;
   final TitleItem title;
@@ -23,10 +26,13 @@ class _PlayerPageState extends State<PlayerPage> {
   bool _show = true;
   bool _locked = false;
   double _speed = 1.0;
+  String _quality = '1080p';
+  String _server = 'Server A';
+  String _track = 'SUB';
   String _audio = 'English';
   String _subs = 'English';
   Timer? _hideTimer;
-  int _flashSeek = 0; // -10, 0, +10 overlay
+  int _flashSeek = 0;
   Timer? _flashTimer;
   Episode? _episode;
 
@@ -48,14 +54,13 @@ class _PlayerPageState extends State<PlayerPage> {
     _c = null;
     if (mounted) setState(() => _ready = false);
     await old?.dispose();
-    final ctrl =
-        VideoPlayerController.networkUrl(Uri.parse(t.videoUrl));
+    final ctrl = VideoPlayerController.networkUrl(Uri.parse(t.videoUrl));
     _c = ctrl;
     try {
       await ctrl.initialize();
       if (!mounted) return;
       var start = Duration(seconds: ep?.startOffsetSeconds ?? 0);
-      if (resume && ep == null || (resume && _episode == ep)) {
+      if (resume) {
         final ratio = widget.state.progressFor(t);
         final saved = ctrl.value.duration * ratio;
         if (saved > start && ratio < 0.95) start = saved;
@@ -101,8 +106,7 @@ class _PlayerPageState extends State<PlayerPage> {
   void _seekBy(int seconds) {
     final c = _c;
     if (c == null || !_ready) return;
-    final target = c.value.position + Duration(seconds: seconds);
-    c.seekTo(target);
+    c.seekTo(c.value.position + Duration(seconds: seconds));
     setState(() => _flashSeek = seconds);
     _flashTimer?.cancel();
     _flashTimer = Timer(const Duration(milliseconds: 600), () {
@@ -113,15 +117,14 @@ class _PlayerPageState extends State<PlayerPage> {
   Episode? get _nextEpisode {
     if (!t.isSeries || _episode == null) return null;
     for (final s in t.seasons) {
-      final idx = s.episodes.indexWhere((e) => e.number == _episode!.number);
-      if (idx >= 0 && s.episodes.contains(_episode)) {
-        if (idx + 1 < s.episodes.length) return s.episodes[idx + 1];
-        final sIdx = t.seasons.indexOf(s);
-        if (sIdx + 1 < t.seasons.length) {
-          return t.seasons[sIdx + 1].episodes.first;
-        }
-        return null;
+      if (!s.episodes.contains(_episode)) continue;
+      final idx = s.episodes.indexOf(_episode!);
+      if (idx + 1 < s.episodes.length) return s.episodes[idx + 1];
+      final sIdx = t.seasons.indexOf(s);
+      if (sIdx + 1 < t.seasons.length) {
+        return t.seasons[sIdx + 1].episodes.first;
       }
+      return null;
     }
     return null;
   }
@@ -161,25 +164,27 @@ class _PlayerPageState extends State<PlayerPage> {
           Center(
             child: (_ready && c != null)
                 ? AspectRatio(
-                    aspectRatio: c.value.aspectRatio == 0
-                        ? 16 / 9
-                        : c.value.aspectRatio,
+                    aspectRatio:
+                        c.value.aspectRatio == 0 ? 16 / 9 : c.value.aspectRatio,
                     child: VideoPlayer(c),
                   )
                 : const SizedBox.shrink(),
           ),
           if (!_ready && !_error)
-            const Center(
-                child: CircularProgressIndicator(color: kCyan)),
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
           if (_error)
             Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.error_outline, color: Colors.white54, size: 44),
+                const Icon(Icons.error_outline,
+                    color: Colors.white54, size: 44),
                 const SizedBox(height: 10),
                 const Text('This demo video could not be loaded.',
                     style: TextStyle(color: Colors.white70)),
                 const SizedBox(height: 12),
                 FilledButton(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black),
                   onPressed: () {
                     setState(() => _error = false);
                     _load(_episode);
@@ -188,7 +193,6 @@ class _PlayerPageState extends State<PlayerPage> {
                 ),
               ]),
             ),
-          // double-tap seek zones
           if (_ready && !_locked)
             Row(children: [
               Expanded(
@@ -214,7 +218,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(24)),
-                child: Text('${_flashSeek > 0 ? '+' : ''}${_flashSeek}s',
+                child: Text('${_flashSeek > 0 ? '+' : ''}$_flashSeek s',
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 17,
@@ -259,16 +263,15 @@ class _PlayerPageState extends State<PlayerPage> {
     final pos = c.value.position;
     final dur = c.value.duration;
     final playing = c.value.isPlaying;
-    final ended = dur > Duration.zero && pos >= dur - const Duration(milliseconds: 400);
-    final showSkipIntro =
-        pos.inSeconds >= 5 && pos.inSeconds <= 25 && !ended;
+    final ended =
+        dur > Duration.zero && pos >= dur - const Duration(milliseconds: 400);
+    final showSkipIntro = pos.inSeconds >= 5 && pos.inSeconds <= 25 && !ended;
     final next = _nextEpisode;
     final heading = _episode != null
         ? '${t.name} — S${_seasonOf(_episode!)}:E${_episode!.number} "${_episode!.name}"'
         : t.name;
 
     return Stack(fit: StackFit.expand, children: [
-      // top bar
       Positioned(
         top: 0,
         left: 0,
@@ -300,12 +303,29 @@ class _PlayerPageState extends State<PlayerPage> {
                           fontSize: 15.5,
                           fontWeight: FontWeight.w600)),
                 ),
+                // AniLab-style quality selector, top-right
+                GestureDetector(
+                  onTap: _qualitySheet,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white54),
+                        borderRadius: BorderRadius.circular(6)),
+                    child: Text(_quality,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.cast_rounded, color: Colors.white),
                   onPressed: () => toast(context, 'Cast is a demo in this UI'),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.subtitles_rounded, color: Colors.white),
+                  icon:
+                      const Icon(Icons.subtitles_rounded, color: Colors.white),
                   onPressed: _audioSubsSheet,
                 ),
               ]),
@@ -313,10 +333,9 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
         ),
       ),
-      // center transport
       Center(
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          _transportBtn(Icons.replay_10_rounded, 44, () => _seekBy(-10)),
+          _transportBtn(Icons.replay_10_rounded, () => _seekBy(-10)),
           const SizedBox(width: 34),
           GestureDetector(
             onTap: () {
@@ -332,8 +351,8 @@ class _PlayerPageState extends State<PlayerPage> {
               setState(() {});
             },
             child: Container(
-              width: 74,
-              height: 74,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.black.withValues(alpha: 0.45),
@@ -346,35 +365,36 @@ class _PlayerPageState extends State<PlayerPage> {
                           ? Icons.pause_rounded
                           : Icons.play_arrow_rounded),
                   color: Colors.white,
-                  size: 44),
+                  size: 42),
             ),
           ),
           const SizedBox(width: 34),
-          _transportBtn(Icons.forward_10_rounded, 44, () => _seekBy(10)),
+          _transportBtn(Icons.forward_10_rounded, () => _seekBy(10)),
         ]),
       ),
-      // skip intro
       if (showSkipIntro)
         Positioned(
           right: 22,
           bottom: 108,
-          child: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white70),
-              backgroundColor: Colors.black.withValues(alpha: 0.5),
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => c.seekTo(pos + const Duration(seconds: 20)),
-            child: const Text('Skip Intro'),
+            child: const Text('Skip Intro',
+                style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ),
-      // next episode (near end or ended)
-      if (next != null && (ended || (dur > Duration.zero && dur - pos < const Duration(seconds: 30))))
+      if (next != null &&
+          (ended ||
+              (dur > Duration.zero &&
+                  dur - pos < const Duration(seconds: 30))))
         Positioned(
           right: 22,
-          bottom: showSkipIntro ? 160 : 108,
+          bottom: showSkipIntro ? 162 : 108,
           child: FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor: Colors.white,
@@ -384,10 +404,10 @@ class _PlayerPageState extends State<PlayerPage> {
             ),
             onPressed: () => _load(next),
             icon: const Icon(Icons.skip_next_rounded),
-            label: Text("Next Ep. ${next.number}"),
+            label: Text('Next Ep. ${next.number}',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ),
-      // bottom bar
       Positioned(
         left: 0,
         right: 0,
@@ -413,10 +433,10 @@ class _PlayerPageState extends State<PlayerPage> {
                     child: SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         trackHeight: 3.5,
-                        thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 7),
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 7),
                         overlayShape: SliderComponentShape.noOverlay,
-                        activeTrackColor: kCyan,
+                        activeTrackColor: Colors.white,
                         inactiveTrackColor: Colors.white24,
                         thumbColor: Colors.white,
                       ),
@@ -437,8 +457,7 @@ class _PlayerPageState extends State<PlayerPage> {
                           color: Colors.white70, fontSize: 12.5)),
                 ]),
                 Row(children: [
-                  _bottomBtn(Icons.speed_rounded, 'Speed',
-                      () => _speedSheet(c)),
+                  _bottomBtn(Icons.speed_rounded, 'Speed', () => _speedSheet(c)),
                   if (t.isSeries)
                     _bottomBtn(Icons.list_rounded, 'Episodes', _episodesSheet),
                   _bottomBtn(Icons.subtitles_outlined, 'Audio & Subs',
@@ -469,10 +488,10 @@ class _PlayerPageState extends State<PlayerPage> {
     return 1;
   }
 
-  Widget _transportBtn(IconData icon, double size, VoidCallback onTap) {
+  Widget _transportBtn(IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
-      child: Icon(icon, color: Colors.white, size: size),
+      child: Icon(icon, color: Colors.white, size: 44),
     );
   }
 
@@ -490,12 +509,45 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
+  void _qualitySheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: kSurface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(
+            padding: EdgeInsets.all(18),
+            child: Text('Quality',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800)),
+          ),
+          for (final q in ['Auto', '360p', '480p', '720p', '1080p'])
+            ListTile(
+              title: Text(q, style: const TextStyle(color: Colors.white)),
+              trailing: _quality == q
+                  ? const Icon(Icons.check, color: Colors.white)
+                  : null,
+              onTap: () {
+                setState(() => _quality = q);
+                Navigator.pop(ctx);
+              },
+            ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+  }
+
   void _speedSheet(VideoPlayerController c) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: kSurface,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Padding(
@@ -504,14 +556,14 @@ class _PlayerPageState extends State<PlayerPage> {
                 style: TextStyle(
                     color: Colors.white,
                     fontSize: 17,
-                    fontWeight: FontWeight.w700)),
+                    fontWeight: FontWeight.w800)),
           ),
           for (final s in [0.5, 0.75, 1.0, 1.25, 1.5])
             ListTile(
               title: Text(s == 1.0 ? 'Normal (1.0×)' : '${s}×',
                   style: const TextStyle(color: Colors.white)),
               trailing: _speed == s
-                  ? const Icon(Icons.check, color: kCyan)
+                  ? const Icon(Icons.check, color: Colors.white)
                   : null,
               onTap: () {
                 setState(() => _speed = s);
@@ -530,7 +582,7 @@ class _PlayerPageState extends State<PlayerPage> {
       context: context,
       backgroundColor: kSurface,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: ListView(shrinkWrap: true, children: [
           const Padding(
@@ -539,23 +591,24 @@ class _PlayerPageState extends State<PlayerPage> {
                 style: TextStyle(
                     color: Colors.white,
                     fontSize: 17,
-                    fontWeight: FontWeight.w700)),
+                    fontWeight: FontWeight.w800)),
           ),
           for (final s in t.seasons) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
               child: Text('Season ${s.number}',
                   style: const TextStyle(
-                      color: kCyan, fontWeight: FontWeight.w700)),
+                      color: Colors.white, fontWeight: FontWeight.w700)),
             ),
             for (final ep in s.episodes)
               ListTile(
                 title: Text('${ep.number}. ${ep.name}',
                     style: const TextStyle(color: Colors.white)),
                 subtitle: Text(ep.durationLabel,
-                    style: const TextStyle(color: Colors.white54)),
+                    style: const TextStyle(color: kDim)),
                 trailing: ep == _episode
-                    ? const Icon(Icons.play_circle_fill_rounded, color: kCyan)
+                    ? const Icon(Icons.play_circle_fill_rounded,
+                        color: Colors.white)
                     : null,
                 onTap: () {
                   Navigator.pop(ctx);
@@ -574,29 +627,68 @@ class _PlayerPageState extends State<PlayerPage> {
       context: context,
       backgroundColor: kSurface,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => SafeArea(
           child: ListView(shrinkWrap: true, children: [
             const Padding(
               padding: EdgeInsets.all(18),
-              child: Text('Audio & Subtitles',
+              child: Text('Watch Options',
                   style: TextStyle(
                       color: Colors.white,
                       fontSize: 17,
-                      fontWeight: FontWeight.w700)),
+                      fontWeight: FontWeight.w800)),
             ),
             const Padding(
-              padding: EdgeInsets.fromLTRB(18, 0, 18, 4),
+              padding: EdgeInsets.fromLTRB(18, 0, 18, 6),
+              child: Text('Version',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Row(children: [
+                for (final v in ['SUB', 'DUB'])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: ChoiceChip(
+                      label: Text(v),
+                      selected: _track == v,
+                      selectedColor: Colors.white,
+                      backgroundColor: kTile,
+                      labelStyle: TextStyle(
+                          color: _track == v ? Colors.black : Colors.white,
+                          fontWeight: FontWeight.w700),
+                      onSelected: (_) => setLocal(() => _track = v),
+                    ),
+                  ),
+              ]),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 16, 18, 4),
+              child: Text('Server',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
+            for (final s in ['Server A', 'Server B'])
+              ListTile(
+                title: Text(s, style: const TextStyle(color: Colors.white)),
+                trailing: _server == s
+                    ? const Icon(Icons.check, color: Colors.white)
+                    : null,
+                onTap: () => setLocal(() => _server = s),
+              ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 8, 18, 4),
               child: Text('Audio',
                   style: TextStyle(
-                      color: kCyan, fontWeight: FontWeight.w700)),
+                      color: Colors.white, fontWeight: FontWeight.w700)),
             ),
             for (final a in ['English', 'Bangla', 'Hindi'])
               ListTile(
                 title: Text(a, style: const TextStyle(color: Colors.white)),
                 trailing: _audio == a
-                    ? const Icon(Icons.check, color: kCyan)
+                    ? const Icon(Icons.check, color: Colors.white)
                     : null,
                 onTap: () => setLocal(() => _audio = a),
               ),
@@ -604,18 +696,21 @@ class _PlayerPageState extends State<PlayerPage> {
               padding: EdgeInsets.fromLTRB(18, 8, 18, 4),
               child: Text('Subtitles',
                   style: TextStyle(
-                      color: kCyan, fontWeight: FontWeight.w700)),
+                      color: Colors.white, fontWeight: FontWeight.w700)),
             ),
             for (final s in ['Off', 'English', 'Bangla'])
               ListTile(
                 title: Text(s, style: const TextStyle(color: Colors.white)),
                 trailing:
-                    _subs == s ? const Icon(Icons.check, color: kCyan) : null,
+                    _subs == s ? const Icon(Icons.check, color: Colors.white) : null,
                 onTap: () => setLocal(() => _subs = s),
               ),
             Padding(
               padding: const EdgeInsets.all(14),
               child: FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black),
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Done'),
               ),

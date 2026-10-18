@@ -1,6 +1,6 @@
-# Nova — Streaming UI (Flutter)
+# MovieBox — Streaming UI (Flutter)
 
-A Netflix-style streaming app UI/UX built with Flutter, following the 2026
+A streaming app UI/UX built with Flutter in the AniLab design language (pure black, monochrome, white pill actions, 5-tab outline nav: Home / Genres / Latest / Search / My List), following the 2026
 mobile redesign layout — with its own original branding ("Nova"), colour
 palette, icons and artwork. Demo only: all titles are fictional and the
 playable videos are openly licensed sample films.
